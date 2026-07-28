@@ -218,6 +218,29 @@
     text-align:right;margin-top:14px;text-decoration:underline;cursor:pointer;
   }
   .loading{text-align:center;padding:60px 0;font-family:'JetBrains Mono',monospace;color:var(--ink-soft);font-size:12px;}
+
+  /* sync */
+  .sync-box{
+    margin-top:18px;background:var(--card);border-radius:14px;padding:12px 14px;
+  }
+  .sync-status{
+    font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-soft);margin-bottom:8px;
+  }
+  .sync-row{display:flex;gap:8px;}
+  .sync-row input{
+    flex:1;font-family:-apple-system,sans-serif;font-size:13px;border:1px solid var(--grid-line);
+    border-radius:10px;padding:8px 10px;background:var(--paper);color:var(--ink);min-width:0;
+  }
+  .sync-row button{
+    font-family:-apple-system,sans-serif;font-size:13px;font-weight:600;border:none;border-radius:10px;
+    padding:8px 14px;background:var(--ink);color:var(--paper);cursor:pointer;white-space:nowrap;
+  }
+  .sync-disconnect{
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:'JetBrains Mono',monospace;font-size:11px;
+  }
+  .sync-connected-label{color:var(--wt);}
+  .sync-disconnect-link{color:var(--bp);text-decoration:underline;cursor:pointer;}
 </style>
 </head>
 <body>
@@ -249,6 +272,18 @@
   <div class="cal-grid" id="cal-grid"><div class="loading">Loading your ledger…</div></div>
 
   <div class="unit-toggle" id="unit-toggle">weight in lb — tap to switch to kg</div>
+
+  <div class="sync-box">
+    <div class="sync-status" id="sync-status">Not synced — entries stay on this device only</div>
+    <div class="sync-row" id="sync-row">
+      <input type="text" id="sync-code-input" placeholder="Household code (e.g. smithvitals2026)">
+      <button id="sync-connect-btn">Connect</button>
+    </div>
+    <div class="sync-disconnect" id="sync-disconnect-row" style="display:none;">
+      <span id="sync-connected-label"></span>
+      <span class="sync-disconnect-link" id="sync-disconnect-link">Disconnect</span>
+    </div>
+  </div>
 </div>
 
 <div class="sheet-backdrop" id="sheet-backdrop">
@@ -288,6 +323,20 @@
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDdJLGwVEnmNw1dVMvTc9xg4YwP_eP5pV8",
+    authDomain: "vitals-ledger.firebaseapp.com",
+    projectId: "vitals-ledger",
+    storageBucket: "vitals-ledger.firebasestorage.app",
+    messagingSenderId: "315048534774",
+    appId: "1:315048534774:web:5891aa470ae75b147682d7"
+  };
+  const firebaseApp = firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+</script>
 <script>
 (function(){
   const LEGACY_ENTRIES_KEY = 'entries'; // pre-multi-person data lives here
@@ -310,6 +359,125 @@
       localStorage.setItem(LS_PREFIX+key, value);
       return { value };
     }catch(e){ return null; }
+  }
+
+  const HOUSEHOLD_KEY = LS_PREFIX+'household-code';
+  let householdCode = null;
+  let householdUnsub = null;
+  let applyingRemote = false; // guards against re-pushing data we just received
+
+  function sanitizeCode(raw){
+    return raw.trim().toLowerCase().replace(/[^a-z0-9-_]/g,'');
+  }
+
+  async function gatherAllEntries(){
+    const map = {};
+    for(const p of people){
+      if(p.id===currentPersonId){ map[p.id] = entries; continue; }
+      try{
+        const res = await storageGet(entriesKey(p.id));
+        map[p.id] = res && res.value ? JSON.parse(res.value) : {};
+      }catch(e){ map[p.id] = {}; }
+    }
+    return map;
+  }
+
+  async function pushToCloud(){
+    if(!householdCode || applyingRemote) return;
+    try{
+      const entriesByPerson = await gatherAllEntries();
+      await db.collection('households').doc(householdCode).set({
+        people,
+        entriesByPerson,
+        settings: { unit: settings.unit },
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge:true });
+    }catch(e){ console.error('Cloud sync failed', e); }
+  }
+
+  async function applyRemoteData(data){
+    if(!data) return;
+    applyingRemote = true;
+    try{
+      if(Array.isArray(data.people) && data.people.length){
+        people = data.people;
+        await storageSet(PEOPLE_KEY, JSON.stringify(people));
+      }
+      if(data.settings && data.settings.unit){
+        settings.unit = data.settings.unit;
+        renderUnitLabel();
+      }
+      if(data.entriesByPerson){
+        for(const pid in data.entriesByPerson){
+          await storageSet(entriesKey(pid), JSON.stringify(data.entriesByPerson[pid]));
+        }
+      }
+      if(!people.some(p=>p.id===currentPersonId)) currentPersonId = people[0].id;
+      entries = (data.entriesByPerson && data.entriesByPerson[currentPersonId]) || await loadEntriesFor(currentPersonId);
+      renderPeopleRow();
+      renderLastReading();
+      renderTrend();
+      renderCalendar();
+    } finally {
+      applyingRemote = false;
+    }
+  }
+
+  async function connectHousehold(rawCode){
+    const code = sanitizeCode(rawCode);
+    if(!code){ alert('Enter a household code first.'); return; }
+    document.getElementById('sync-connect-btn').textContent = 'Connecting…';
+    try{
+      const ref = db.collection('households').doc(code);
+      const snap = await ref.get();
+      if(snap.exists){
+        await applyRemoteData(snap.data());
+      } else {
+        householdCode = code;
+        await pushToCloud();
+      }
+      householdCode = code;
+      localStorage.setItem(HOUSEHOLD_KEY, code);
+      attachHouseholdListener();
+      renderSyncStatus();
+    }catch(e){
+      console.error(e);
+      alert('Could not connect — check your connection and try again.');
+    }
+    document.getElementById('sync-connect-btn').textContent = 'Connect';
+  }
+
+  function attachHouseholdListener(){
+    if(householdUnsub) householdUnsub();
+    householdUnsub = db.collection('households').doc(householdCode)
+      .onSnapshot(snap=>{
+        if(snap.exists) applyRemoteData(snap.data());
+      }, err=>console.error('Sync listener error', err));
+  }
+
+  function disconnectHousehold(){
+    if(householdUnsub){ householdUnsub(); householdUnsub=null; }
+    householdCode = null;
+    localStorage.removeItem(HOUSEHOLD_KEY);
+    renderSyncStatus();
+  }
+
+  function renderSyncStatus(){
+    const statusEl = document.getElementById('sync-status');
+    const rowEl = document.getElementById('sync-row');
+    const discRow = document.getElementById('sync-disconnect-row');
+    const label = document.getElementById('sync-connected-label');
+    if(householdCode){
+      statusEl.style.display='none';
+      rowEl.style.display='none';
+      discRow.style.display='flex';
+      label.textContent = `Synced as "${householdCode}"`;
+    } else {
+      statusEl.style.display='block';
+      statusEl.textContent = 'Not synced — entries stay on this device only';
+      rowEl.style.display='flex';
+      discRow.style.display='none';
+    }
   }
 
   let people = [];
@@ -409,6 +577,7 @@
     const id = 'p_'+Date.now();
     people.push({ id, name });
     await savePeople();
+    pushToCloud();
     closeAddPerson();
     await switchPerson(id);
   }
@@ -427,6 +596,9 @@
     document.getElementById('unit-toggle').onclick=toggleUnit;
     document.getElementById('add-person-save').onclick=confirmAddPerson;
     document.getElementById('add-person-cancel').onclick=closeAddPerson;
+    document.getElementById('sync-connect-btn').onclick=()=>connectHousehold(document.getElementById('sync-code-input').value);
+    document.getElementById('sync-disconnect-link').onclick=disconnectHousehold;
+    renderSyncStatus();
     renderUnitLabel();
     (async ()=>{
       await loadPeople();
@@ -442,6 +614,16 @@
       renderLastReading();
       renderTrend();
       renderCalendar();
+      const savedCode = localStorage.getItem(HOUSEHOLD_KEY);
+      if(savedCode){
+        householdCode = savedCode;
+        renderSyncStatus();
+        try{
+          const snap = await db.collection('households').doc(savedCode).get();
+          if(snap.exists) await applyRemoteData(snap.data());
+          attachHouseholdListener();
+        }catch(e){ console.error('Auto-connect failed', e); }
+      }
     })();
   }
 
@@ -456,6 +638,7 @@
     settings.unit = settings.unit==='lb' ? 'kg' : 'lb';
     renderUnitLabel();
     saveSettings();
+    pushToCloud();
     renderLastReading();
   }
   function renderUnitLabel(){
@@ -631,6 +814,7 @@
       };
     }
     await saveEntries();
+    pushToCloud();
     closeSheet();
     renderLastReading();
     renderTrend();
@@ -641,6 +825,7 @@
     if(!activeDate) return;
     delete entries[activeDate];
     await saveEntries();
+    pushToCloud();
     closeSheet();
     renderLastReading();
     renderTrend();
