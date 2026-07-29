@@ -405,7 +405,7 @@
       <div class="field-group">
         <span class="field-label">Blood pressure (mmHg)</span>
         <div class="bp-row">
-          <input type="number" id="in-systolic" placeholder="Systolic" inputmode="numeric">
+          <input type="number" id="in-systolic" placeholder="Systolic" inputmode="numeric" maxlength="3">
           <span class="bp-sep">/</span>
           <input type="number" id="in-diastolic" placeholder="Diastolic" inputmode="numeric">
         </div>
@@ -828,6 +828,12 @@
     document.getElementById('btn-delete').onclick=onDelete;
     document.getElementById('btn-close').onclick=closeSheet;
     document.getElementById('btn-view-edit').onclick=switchToEditMode;
+    document.getElementById('in-systolic').addEventListener('input', function(){
+      if(this.value.length >= 3){
+        this.value = this.value.slice(0,3);
+        document.getElementById('in-diastolic').focus();
+      }
+    });
     document.getElementById('btn-view-delete').onclick=onDelete;
     document.getElementById('sheet-backdrop').onclick=(e)=>{ if(e.target.id==='sheet-backdrop') closeSheet(); };
     document.getElementById('unit-toggle').onclick=toggleUnit;
