@@ -75,6 +75,7 @@
     cursor:pointer;white-space:nowrap;border:1px solid rgba(31,42,36,.06);
   }
   .person-pill.active{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+  .person-pill.active::after{content:" ✎";opacity:.6;font-size:10px;}
   .person-pill.add{color:var(--ink-soft);background:transparent;border:1px dashed var(--grid-line);}
   .add-person-row{
     display:none;gap:8px;margin-top:8px;align-items:center;
@@ -88,44 +89,20 @@
     font-family:-apple-system,sans-serif;font-size:13px;font-weight:600;border:none;border-radius:10px;
     padding:8px 12px;background:var(--ink);color:var(--paper);cursor:pointer;
   }
-
-  /* last reading strip */
-  .last-reading{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:12px 10px;
-    margin-top:14px;
-    background:var(--card);
-    border-radius:14px;
-    padding:12px 14px;
-    box-shadow:0 1px 0 rgba(31,42,36,.06);
+  .edit-person-row{
+    display:none;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap;
   }
-  .lr-item{min-width:0;}
-  .lr-label{
-    font-family:'JetBrains Mono',monospace;
-    font-size:9.5px;
-    letter-spacing:.08em;
-    text-transform:uppercase;
-    color:var(--ink-soft);
-    display:block;
-    margin-bottom:2px;
+  .edit-person-row.open{display:flex;}
+  .edit-person-row input{
+    flex:1;min-width:120px;font-family:-apple-system,sans-serif;font-size:13px;border:1px solid var(--grid-line);
+    border-radius:10px;padding:8px 10px;background:var(--card);color:var(--ink);
   }
-  .lr-value{
-    font-family:'JetBrains Mono',monospace;
-    font-size:16px;
-    font-weight:600;
-    font-variant-numeric:tabular-nums;
+  .edit-person-row button{
+    font-family:-apple-system,sans-serif;font-size:13px;font-weight:600;border:none;border-radius:10px;
+    padding:8px 12px;background:var(--ink);color:var(--paper);cursor:pointer;
   }
-  .lr-value.bp{color:var(--bp)}
-  .lr-value.hr{color:var(--hr)}
-  .lr-value.wt{color:var(--wt)}
-  .lr-value.alc{color:var(--alc)}
-  .lr-empty{
-    font-family:'JetBrains Mono',monospace;
-    font-size:13px;
-    color:var(--ink-soft);
-    padding:4px 2px;
-  }
+  .edit-person-row button.ep-delete{background:var(--bp);}
+  .edit-person-row button.ep-cancel{background:transparent;color:var(--ink-soft);}
 
   /* goal weight */
   .goal-box{
@@ -218,6 +195,17 @@
   .sheet-title{font-family:'Fraunces',serif;font-weight:600;font-size:20px;margin:0 0 2px;}
   .sheet-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);margin:0 0 18px;}
   .field-group{margin-bottom:16px;}
+
+  /* view mode */
+  .sheet-view{margin-bottom:18px;}
+  .view-row{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:10px 0;border-bottom:1px solid rgba(31,42,36,.08);
+  }
+  .view-label{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);}
+  .view-value{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;color:var(--ink);}
+  .view-notes-row{flex-direction:column;align-items:stretch;gap:6px;}
+  .view-notes{font-family:-apple-system,sans-serif;font-size:14px;color:var(--ink);line-height:1.4;}
   .field-label{
     font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;
     color:var(--ink-soft);display:block;margin-bottom:6px;
@@ -344,7 +332,12 @@
       <button id="add-person-save">Add</button>
       <button id="add-person-cancel" style="background:transparent;color:var(--ink-soft);">Cancel</button>
     </div>
-    <div class="last-reading" id="last-reading"><div class="lr-empty">Loading…</div></div>
+    <div class="edit-person-row" id="edit-person-row">
+      <input type="text" id="edit-person-input" placeholder="Name" maxlength="24">
+      <button id="edit-person-save">Save</button>
+      <button class="ep-delete" id="edit-person-delete">Delete</button>
+      <button class="ep-cancel" id="edit-person-cancel">Cancel</button>
+    </div>
     <div class="goal-box" id="goal-box">
       <span class="goal-label" id="goal-label">No goal weight set</span>
       <span class="goal-edit-link" id="goal-edit-link">Set goal</span>
@@ -393,40 +386,58 @@
     <p class="sheet-title" id="sheet-title">—</p>
     <p class="sheet-sub" id="sheet-sub">Enter today's readings</p>
 
-    <div class="field-group">
-      <span class="field-label">Blood pressure (mmHg)</span>
-      <div class="bp-row">
-        <input type="number" id="in-systolic" placeholder="Systolic" inputmode="numeric">
-        <span class="bp-sep">/</span>
-        <input type="number" id="in-diastolic" placeholder="Diastolic" inputmode="numeric">
+    <div class="sheet-view" id="sheet-view">
+      <div class="view-row"><span class="view-label">Blood pressure</span><span class="view-value" id="view-bp">—</span></div>
+      <div class="view-row"><span class="view-label">Heart rate</span><span class="view-value" id="view-hr">—</span></div>
+      <div class="view-row"><span class="view-label">Weight</span><span class="view-value" id="view-weight">—</span></div>
+      <div class="view-row"><span class="view-label">Alcohol</span><span class="view-value" id="view-drank">—</span></div>
+      <div class="view-row view-notes-row" id="view-notes-row" style="display:none;">
+        <span class="view-label">Notes</span>
+        <div class="view-notes" id="view-notes-display"></div>
       </div>
     </div>
-    <div class="two-col">
-      <div class="field-group">
-        <span class="field-label">Heart rate (bpm)</span>
-        <input type="number" id="in-hr" placeholder="—" inputmode="numeric">
-      </div>
-      <div class="field-group">
-        <span class="field-label" id="weight-field-label">Weight (lb)</span>
-        <input type="number" id="in-weight" placeholder="—" inputmode="decimal" step="0.1">
-      </div>
-    </div>
-    <div class="field-group">
-      <span class="field-label">Did you drink today?</span>
-      <div class="drink-toggle">
-        <div class="drink-btn" id="drink-yes-btn">Yes</div>
-        <div class="drink-btn" id="drink-no-btn">No</div>
-      </div>
-    </div>
-    <div class="field-group">
-      <span class="field-label">Notes</span>
-      <textarea id="in-notes" placeholder="Optional — how you're feeling, meds, context…"></textarea>
+    <div class="sheet-actions" id="sheet-view-actions">
+      <button class="btn btn-delete" id="btn-view-delete">Delete</button>
+      <button class="btn btn-save" id="btn-view-edit">Edit</button>
     </div>
 
-    <div class="sheet-actions">
-      <button class="btn btn-delete" id="btn-delete" style="display:none;">Delete</button>
-      <button class="btn btn-save" id="btn-save">Save entry</button>
+    <div id="sheet-edit-fields" style="display:none;">
+      <div class="field-group">
+        <span class="field-label">Blood pressure (mmHg)</span>
+        <div class="bp-row">
+          <input type="number" id="in-systolic" placeholder="Systolic" inputmode="numeric">
+          <span class="bp-sep">/</span>
+          <input type="number" id="in-diastolic" placeholder="Diastolic" inputmode="numeric">
+        </div>
+      </div>
+      <div class="two-col">
+        <div class="field-group">
+          <span class="field-label">Heart rate (bpm)</span>
+          <input type="number" id="in-hr" placeholder="—" inputmode="numeric">
+        </div>
+        <div class="field-group">
+          <span class="field-label" id="weight-field-label">Weight (lb)</span>
+          <input type="number" id="in-weight" placeholder="—" inputmode="decimal" step="0.1">
+        </div>
+      </div>
+      <div class="field-group">
+        <span class="field-label">Did you drink today?</span>
+        <div class="drink-toggle">
+          <div class="drink-btn" id="drink-yes-btn">Yes</div>
+          <div class="drink-btn" id="drink-no-btn">No</div>
+        </div>
+      </div>
+      <div class="field-group">
+        <span class="field-label">Notes</span>
+        <textarea id="in-notes" placeholder="Optional — how you're feeling, meds, context…"></textarea>
+      </div>
+
+      <div class="sheet-actions" id="sheet-edit-actions">
+        <button class="btn btn-delete" id="btn-delete" style="display:none;">Delete</button>
+        <button class="btn btn-save" id="btn-save">Save entry</button>
+      </div>
     </div>
+
     <div class="btn-close" id="btn-close">Close</div>
   </div>
 </div>
@@ -531,12 +542,31 @@
     }catch(e){ console.error('Cloud sync failed', e); }
   }
 
+  async function removePersonFromCloud(id){
+    if(!householdCode) return;
+    try{
+      await db.collection('households').doc(householdCode).set({
+        [`entriesByPerson.${id}`]: firebase.firestore.FieldValue.delete(),
+        [`goalsByPerson.${id}`]: firebase.firestore.FieldValue.delete()
+      }, { merge:true });
+    }catch(e){ console.error('Cloud person removal failed', e); }
+  }
+
   async function applyRemoteData(data){
     if(!data) return;
     applyingRemote = true;
     try{
       if(Array.isArray(data.people) && data.people.length){
+        const oldIds = people.map(p=>p.id);
         people = data.people;
+        const newIds = new Set(people.map(p=>p.id));
+        for(const oldId of oldIds){
+          if(!newIds.has(oldId)){
+            localStorage.removeItem(LS_PREFIX+entriesKey(oldId));
+            localStorage.removeItem(LS_PREFIX+goalKey(oldId));
+            delete goals[oldId];
+          }
+        }
         await storageSet(PEOPLE_KEY, JSON.stringify(people));
       }
       if(data.settings && data.settings.unit){
@@ -558,7 +588,6 @@
       if(!people.some(p=>p.id===currentPersonId)) currentPersonId = people[0].id;
       entries = (data.entriesByPerson && data.entriesByPerson[currentPersonId]) || await loadEntriesFor(currentPersonId);
       renderPeopleRow();
-      renderLastReading();
       renderTrend();
       renderCalendar();
       renderGoalBox();
@@ -679,6 +708,8 @@
     try{ await storageSet(SETTINGS_KEY, JSON.stringify(settings)); }catch(e){}
   }
 
+  let editingPersonId = null;
+
   function renderPeopleRow(){
     const row = document.getElementById('person-row');
     row.innerHTML='';
@@ -686,7 +717,10 @@
       const pill=document.createElement('div');
       pill.className='person-pill'+(p.id===currentPersonId?' active':'');
       pill.textContent=p.name;
-      pill.onclick=()=>switchPerson(p.id);
+      pill.onclick=()=>{
+        if(p.id===currentPersonId){ openEditPerson(p.id); }
+        else{ switchPerson(p.id); }
+      };
       row.appendChild(pill);
     });
     const addPill=document.createElement('div');
@@ -704,13 +738,13 @@
     renderPeopleRow();
     entries = await loadEntriesFor(id);
     if(!(id in goals)) goals[id] = await loadGoalFor(id);
-    renderLastReading();
     renderTrend();
     renderCalendar();
     renderGoalBox();
   }
 
   function openAddPerson(){
+    closeEditPerson();
     document.getElementById('add-person-row').classList.add('open');
     document.getElementById('add-person-input').value='';
     document.getElementById('add-person-input').focus();
@@ -729,6 +763,60 @@
     await switchPerson(id);
   }
 
+  function openEditPerson(id){
+    closeAddPerson();
+    editingPersonId = id;
+    const p = people.find(p=>p.id===id);
+    document.getElementById('edit-person-input').value = p ? p.name : '';
+    document.getElementById('edit-person-row').classList.add('open');
+    document.getElementById('edit-person-input').focus();
+  }
+  function closeEditPerson(){
+    editingPersonId = null;
+    document.getElementById('edit-person-row').classList.remove('open');
+  }
+  async function confirmEditPerson(){
+    if(!editingPersonId) return;
+    const name = document.getElementById('edit-person-input').value.trim();
+    if(!name) return;
+    const p = people.find(p=>p.id===editingPersonId);
+    if(p) p.name = name;
+    await savePeople();
+    pushToCloud();
+    closeEditPerson();
+    renderPeopleRow();
+  }
+  async function deletePerson(){
+    if(!editingPersonId) return;
+    if(people.length<=1){
+      alert('You need at least one person — add another before deleting this one.');
+      return;
+    }
+    const p = people.find(p=>p.id===editingPersonId);
+    const confirmed = confirm(`Delete ${p ? p.name : 'this person'}? This removes their logged entries.`);
+    if(!confirmed) return;
+    const deletedId = editingPersonId;
+    people = people.filter(p=>p.id!==deletedId);
+    await savePeople();
+    localStorage.removeItem(LS_PREFIX+entriesKey(deletedId));
+    localStorage.removeItem(LS_PREFIX+goalKey(deletedId));
+    delete goals[deletedId];
+    closeEditPerson();
+    if(currentPersonId===deletedId){
+      currentPersonId = people[0].id;
+      settings.currentPersonId = currentPersonId;
+      saveSettings();
+      entries = await loadEntriesFor(currentPersonId);
+      if(!(currentPersonId in goals)) goals[currentPersonId] = await loadGoalFor(currentPersonId);
+    }
+    await removePersonFromCloud(deletedId);
+    pushToCloud();
+    renderPeopleRow();
+    renderTrend();
+    renderCalendar();
+    renderGoalBox();
+  }
+
   function init(){
     viewYear = today.getFullYear();
     viewMonth = today.getMonth();
@@ -739,10 +827,15 @@
     document.getElementById('btn-save').onclick=onSave;
     document.getElementById('btn-delete').onclick=onDelete;
     document.getElementById('btn-close').onclick=closeSheet;
+    document.getElementById('btn-view-edit').onclick=switchToEditMode;
+    document.getElementById('btn-view-delete').onclick=onDelete;
     document.getElementById('sheet-backdrop').onclick=(e)=>{ if(e.target.id==='sheet-backdrop') closeSheet(); };
     document.getElementById('unit-toggle').onclick=toggleUnit;
     document.getElementById('add-person-save').onclick=confirmAddPerson;
     document.getElementById('add-person-cancel').onclick=closeAddPerson;
+    document.getElementById('edit-person-save').onclick=confirmEditPerson;
+    document.getElementById('edit-person-delete').onclick=deletePerson;
+    document.getElementById('edit-person-cancel').onclick=closeEditPerson;
     document.getElementById('sync-connect-btn').onclick=()=>connectHousehold(document.getElementById('sync-code-input').value);
     document.getElementById('sync-disconnect-link').onclick=disconnectHousehold;
     document.getElementById('drink-yes-btn').onclick=()=>{
@@ -776,7 +869,6 @@
       renderPeopleRow();
       entries = await loadEntriesFor(currentPersonId);
       goals[currentPersonId] = await loadGoalFor(currentPersonId);
-      renderLastReading();
       renderTrend();
       renderCalendar();
       renderGoalBox();
@@ -805,7 +897,6 @@
     renderUnitLabel();
     saveSettings();
     pushToCloud();
-    renderLastReading();
     renderGoalBox();
   }
   function renderUnitLabel(){
@@ -890,27 +981,6 @@
   }
 
   function sortedDates(){ return Object.keys(entries).sort(); }
-
-  function renderLastReading(){
-    const box = document.getElementById('last-reading');
-    const dates = sortedDates();
-    if(dates.length===0){
-      box.innerHTML = '<div class="lr-empty">No entries yet — tap a day below to start.</div>';
-      return;
-    }
-    const last = entries[dates[dates.length-1]];
-    const d = dates[dates.length-1];
-    const niceDate = new Date(d+'T00:00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'});
-    const bp = (last.systolic && last.diastolic) ? `${last.systolic}/${last.diastolic}` : '—';
-    const hr = last.heartRate ? `${last.heartRate}` : '—';
-    const w = displayWeight(last.weight);
-    const wStr = w!=null ? `${w.toFixed(1)}` : '—';
-    box.innerHTML = `
-      <div class="lr-item"><span class="lr-label">BP · ${niceDate}</span><span class="lr-value bp">${bp}</span></div>
-      <div class="lr-item"><span class="lr-label">Pulse</span><span class="lr-value hr">${hr} bpm</span></div>
-      <div class="lr-item"><span class="lr-label">Weight</span><span class="lr-value wt">${wStr} ${settings.unit}</span></div>
-    `;
-  }
 
   function renderTrend(){
     const dates = sortedDates().slice(-14);
@@ -1150,9 +1220,47 @@
   function openSheet(key){
     activeDate=key;
     const e = entries[key] || {};
+    const hasData = e && Object.keys(e).length > 0;
     const d = new Date(key+'T00:00:00');
     document.getElementById('sheet-title').textContent = d.toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric'});
-    document.getElementById('sheet-sub').textContent = e && Object.keys(e).length ? 'Editing this day\'s readings' : 'Enter this day\'s readings';
+
+    if(hasData){
+      document.getElementById('sheet-sub').textContent = 'Today\'s readings';
+      renderSheetView(e);
+      document.getElementById('sheet-view').style.display='block';
+      document.getElementById('sheet-view-actions').style.display='flex';
+      document.getElementById('sheet-edit-fields').style.display='none';
+    } else {
+      document.getElementById('sheet-sub').textContent = 'Enter this day\'s readings';
+      populateEditFields(e);
+      document.getElementById('sheet-view').style.display='none';
+      document.getElementById('sheet-view-actions').style.display='none';
+      document.getElementById('sheet-edit-fields').style.display='block';
+      document.getElementById('btn-delete').style.display='none';
+    }
+    document.getElementById('sheet-backdrop').classList.add('open');
+  }
+
+  function renderSheetView(e){
+    const bp = (e.systolic && e.diastolic) ? `${e.systolic}/${e.diastolic}` : '—';
+    const hr = e.heartRate ? `${e.heartRate} bpm` : '—';
+    const w = displayWeight(e.weight);
+    const wStr = w!=null ? `${w.toFixed(1)} ${settings.unit}` : '—';
+    const drankStr = e.drank===true ? 'Yes' : (e.drank===false ? 'No' : '—');
+    document.getElementById('view-bp').textContent = bp;
+    document.getElementById('view-hr').textContent = hr;
+    document.getElementById('view-weight').textContent = wStr;
+    document.getElementById('view-drank').textContent = drankStr;
+    const notesRow = document.getElementById('view-notes-row');
+    if(e.notes){
+      document.getElementById('view-notes-display').textContent = e.notes;
+      notesRow.style.display='flex';
+    } else {
+      notesRow.style.display='none';
+    }
+  }
+
+  function populateEditFields(e){
     document.getElementById('in-systolic').value = e.systolic || '';
     document.getElementById('in-diastolic').value = e.diastolic || '';
     document.getElementById('in-hr').value = e.heartRate || '';
@@ -1162,8 +1270,17 @@
     document.getElementById('btn-delete').style.display = (e && Object.keys(e).length) ? 'block':'none';
     pendingDrank = (e.drank===true || e.drank===false) ? e.drank : null;
     renderDrinkButtons();
-    document.getElementById('sheet-backdrop').classList.add('open');
   }
+
+  function switchToEditMode(){
+    const e = entries[activeDate] || {};
+    document.getElementById('sheet-sub').textContent = 'Editing this day\'s readings';
+    populateEditFields(e);
+    document.getElementById('sheet-view').style.display='none';
+    document.getElementById('sheet-view-actions').style.display='none';
+    document.getElementById('sheet-edit-fields').style.display='block';
+  }
+
   function renderDrinkButtons(){
     const yesBtn = document.getElementById('drink-yes-btn');
     const noBtn = document.getElementById('drink-no-btn');
@@ -1202,7 +1319,6 @@
     await saveEntries();
     pushToCloud();
     closeSheet();
-    renderLastReading();
     renderTrend();
     renderCalendar();
     renderGoalBox();
@@ -1214,7 +1330,6 @@
     await saveEntries();
     pushToCloud();
     closeSheet();
-    renderLastReading();
     renderTrend();
     renderCalendar();
   }
