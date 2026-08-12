@@ -6,257 +6,433 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Vitals Ledger">
-<title>Vitals & Vacation Ledger</title>
+<title>Vitals Ledger</title>
 <style>
   :root {
     --bg: #EDF1F0;
     --card: #FFFFFF;
     --text: #1C1C1E;
-    --accent: #007AFF;
-    --border: #E5E5EA;
+    --accent: #2E5A44;
+    --accent-light: #E8F0EC;
+    --border: #D1D5DB;
+    --vacation: #007AFF;
+    --vacation-light: #E5F1FF;
   }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--bg);
     color: var(--text);
     margin: 0;
-    padding: 20px;
-    padding-top: calc(20px + env(safe-area-inset-top));
-  }
-  .card {
-    background: var(--card);
-    border-radius: 12px;
     padding: 16px;
-    margin-bottom: 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    padding-top: calc(16px + env(safe-area-inset-top));
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
   }
-  h3 { margin-top: 0; margin-bottom: 12px; }
-  .grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-  }
-  .form-group {
+
+  /* Header & Year-to-Date Stats */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 12px;
   }
-  label {
-    display: block;
-    font-size: 0.85rem;
-    font-weight: 600;
-    margin-bottom: 4px;
+  .app-title {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 0;
   }
-  input[type="date"], input[type="number"], input[type="text"] {
+  .ytd-badge {
+    background: var(--vacation-light);
+    color: var(--vacation);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border: 1px solid rgba(0,122,255,0.2);
+  }
+
+  /* Calendar Controls */
+  .cal-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--card);
+    padding: 10px 14px;
+    border-radius: 12px 12px 0 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .cal-controls button {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    color: var(--accent);
+    cursor: pointer;
+    padding: 4px 10px;
+  }
+  .month-label {
+    font-weight: 700;
+    font-size: 1.05rem;
+  }
+
+  /* Calendar Grid */
+  .calendar-card {
+    background: var(--card);
+    border-radius: 0 0 12px 12px;
+    padding: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    margin-bottom: 16px;
+  }
+  .weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6B7280;
+    margin-bottom: 6px;
+  }
+  .days-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+  .day-cell {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 2px;
+    background: #F9FAFB;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    position: relative;
+  }
+  .day-cell.other-month { opacity: 0.3; }
+  .day-cell.selected {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+  .day-cell.today {
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .dots-container {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 2px;
+  }
+  .dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+  }
+  .dot-vitals { background-color: var(--accent); }
+  .dot-vacation { background-color: var(--vacation); }
+
+  /* Modal Entry Form */
+  .modal {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4);
+    align-items: flex-end;
+    z-index: 1000;
+  }
+  .modal.open { display: flex; }
+  .modal-content {
+    background: var(--card);
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    padding: 20px;
+    box-sizing: border-box;
+    max-height: 85vh;
+    overflow-y: auto;
+    animation: slideUp 0.25s ease-out;
+  }
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .modal-title { font-size: 1.1rem; font-weight: 700; margin: 0; }
+  .close-btn { background: none; border: none; font-size: 1.5rem; color: #8E8E93; cursor: pointer; }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .form-group { margin-bottom: 12px; }
+  .form-group.full { grid-column: span 2; }
+  label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: #4B5563; }
+  input {
     width: 100%;
     padding: 10px;
     border: 1px solid var(--border);
     border-radius: 8px;
     box-sizing: border-box;
     font-size: 1rem;
+    background: #F9FAFB;
   }
-  button {
+  input:focus { outline: none; border-color: var(--accent); background: #FFF; }
+  
+  .vacation-input {
+    border-color: rgba(0,122,255,0.4);
+    background: var(--vacation-light);
+  }
+
+  .btn-submit {
     width: 100%;
-    background-color: var(--accent);
+    background: var(--accent);
     color: white;
     border: none;
     padding: 12px;
-    border-radius: 8px;
+    border-radius: 10px;
+    font-weight: 700;
     font-size: 1rem;
-    font-weight: bold;
     cursor: pointer;
     margin-top: 8px;
   }
-  .stats-box {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #F2F2F7;
-    padding: 12px;
-    border-radius: 8px;
-  }
-  .stats-number {
-    font-size: 1.4rem;
-    font-weight: bold;
-    color: var(--accent);
-  }
-  .entry-item {
-    border-bottom: 1px solid var(--border);
-    padding: 12px 0;
-  }
-  .entry-item:last-child {
-    border-bottom: none;
-  }
-  .entry-header {
-    display: flex;
-    justify-content: space-between;
-    font-weight: bold;
-    margin-bottom: 4px;
-  }
-  .vitals-grid {
+  .btn-delete {
+    width: 100%;
+    background: none;
+    color: #FF3B30;
+    border: none;
+    padding: 10px;
+    font-weight: 600;
     font-size: 0.9rem;
-    color: #555;
-  }
-  .vacation-badge {
-    background-color: #E5F1FF;
-    color: var(--accent);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-size: 0.85rem;
+    cursor: pointer;
+    margin-top: 4px;
   }
 </style>
 </head>
 <body>
 
-  <!-- YTD Vacation Summary -->
-  <div class="card">
-    <h3><span id="currentYear"></span> Vacation Summary</h3>
-    <div class="stats-box">
-      <span>Vacation Used YTD:</span>
-      <span class="stats-number" id="ytdVacation">0 hrs</span>
+  <!-- App Header -->
+  <div class="header">
+    <h1 class="app-title">Vitals Ledger</h1>
+    <div class="ytd-badge"><span id="ytdHours">0</span> hrs PTO YTD</div>
+  </div>
+
+  <!-- Calendar Interface -->
+  <div class="cal-controls">
+    <button onclick="changeMonth(-1)">&#10094;</button>
+    <div class="month-label" id="monthLabel"></div>
+    <button onclick="changeMonth(1)">&#10095;</button>
+  </div>
+
+  <div class="calendar-card">
+    <div class="weekdays">
+      <div>S</div><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div>
+    </div>
+    <div class="days-grid" id="daysGrid"></div>
+  </div>
+
+  <!-- Tap Date Modal -->
+  <div class="modal" id="entryModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title" id="selectedDateLabel">Entry</h3>
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+      </div>
+
+      <form id="vitalsForm">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="sys">Systolic (Top)</label>
+            <input type="number" id="sys" placeholder="120">
+          </div>
+          <div class="form-group">
+            <label for="dia">Diastolic (Bottom)</label>
+            <input type="number" id="dia" placeholder="80">
+          </div>
+          <div class="form-group">
+            <label for="hr">Heart Rate (BPM)</label>
+            <input type="number" id="hr" placeholder="70">
+          </div>
+          <div class="form-group">
+            <label for="weight">Weight (lbs)</label>
+            <input type="number" step="0.1" id="weight" placeholder="165">
+          </div>
+          <div class="form-group">
+            <label for="temp">Temp (°F)</label>
+            <input type="number" step="0.1" id="temp" placeholder="98.6">
+          </div>
+
+          <!-- NEW FIELD: Vacation Hours -->
+          <div class="form-group">
+            <label for="vacation" style="color: var(--vacation);">Vacation (Hrs)</label>
+            <input type="number" step="0.5" id="vacation" class="vacation-input" placeholder="e.g. 8">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="notes">Notes</label>
+          <input type="text" id="notes" placeholder="Symptoms, medications, etc.">
+        </div>
+
+        <button type="submit" class="btn-submit">Save Information</button>
+        <button type="button" class="btn-delete" id="deleteBtn" onclick="deleteEntry()" style="display:none;">Clear Entry</button>
+      </form>
     </div>
   </div>
 
-  <!-- Entry Form Card -->
-  <div class="card">
-    <h3>Log Daily Entry</h3>
-    <form id="ledgerForm">
-      <div class="form-group">
-        <label for="entryDate">Date</label>
-        <input type="date" id="entryDate" required>
-      </div>
-
-      <div class="grid">
-        <div class="form-group">
-          <label for="sys">Systolic (BP Top)</label>
-          <input type="number" id="sys" placeholder="120">
-        </div>
-        <div class="form-group">
-          <label for="dia">Diastolic (BP Bottom)</label>
-          <input type="number" id="dia" placeholder="80">
-        </div>
-      </div>
-
-      <div class="grid">
-        <div class="form-group">
-          <label for="hr">Heart Rate (BPM)</label>
-          <input type="number" id="hr" placeholder="72">
-        </div>
-        <div class="form-group">
-          <label for="weight">Weight (lbs)</label>
-          <input type="number" step="0.1" id="weight" placeholder="170.5">
-        </div>
-      </div>
-
-      <div class="grid">
-        <div class="form-group">
-          <label for="temp">Temp (°F)</label>
-          <input type="number" step="0.1" id="temp" placeholder="98.6">
-        </div>
-        <div class="form-group">
-          <label for="vacationHours">Vacation Hours</label>
-          <input type="number" id="vacationHours" step="0.5" min="0" placeholder="0">
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label for="notes">Notes</label>
-        <input type="text" id="notes" placeholder="Any additional notes...">
-      </div>
-
-      <button type="submit">Save Entry</button>
-    </form>
-  </div>
-
-  <!-- Recent Entries List -->
-  <div class="card">
-    <h3>History</h3>
-    <div id="entriesList">No entries recorded yet.</div>
-  </div>
-
 <script>
-  const currentYear = new Date().getFullYear();
-  document.getElementById('currentYear').innerText = currentYear;
-  document.getElementById('entryDate').valueAsDate = new Date();
+  let currentDate = new Date();
+  let selectedDateStr = "";
 
-  function getStoredEntries() {
-    return JSON.parse(localStorage.getItem('vitals_ledger') || '[]');
+  function getEntries() {
+    return JSON.parse(localStorage.getItem('vitals_ledger_data') || '{}');
   }
 
-  function saveEntries(entries) {
-    localStorage.setItem('vitals_ledger', JSON.stringify(entries));
-    render();
+  function saveEntries(data) {
+    localStorage.setItem('vitals_ledger_data', JSON.stringify(data));
+    renderCalendar();
   }
 
-  function render() {
-    const entries = getStoredEntries();
-    const listEl = document.getElementById('entriesList');
+  function renderCalendar() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    const monthNames = ["January", "February", "March", "April", "May", "June", 
+                        "July", "August", "September", "October", "November", "December"];
+    document.getElementById('monthLabel').innerText = `${monthNames[month]} ${year}`;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const prevMonthDays = new Date(year, month, 0).getDate();
+
+    const daysGrid = document.getElementById('daysGrid');
+    daysGrid.innerHTML = '';
+
+    const entries = getEntries();
 
     // Calculate YTD Vacation Hours
-    const ytdTotal = entries.reduce((total, entry) => {
-      const entryYear = new Date(entry.date).getFullYear();
-      if (entryYear === currentYear) {
-        return total + (parseFloat(entry.vacationHours) || 0);
+    let ytdVacation = 0;
+    Object.keys(entries).forEach(dateKey => {
+      if (dateKey.startsWith(year.toString())) {
+        ytdVacation += parseFloat(entries[dateKey].vacation || 0);
       }
-      return total;
-    }, 0);
+    });
+    document.getElementById('ytdHours').innerText = ytdVacation;
 
-    document.getElementById('ytdVacation').innerText = `${ytdTotal} hrs`;
-
-    if (entries.length === 0) {
-      listEl.innerHTML = 'No entries recorded yet.';
-      return;
+    // Previous month filler days
+    for (let i = firstDay - 1; i >= 0; i--) {
+      const dayDiv = document.createElement('div');
+      dayDiv.className = 'day-cell other-month';
+      dayDiv.innerText = prevMonthDays - i;
+      daysGrid.appendChild(dayDiv);
     }
 
-    listEl.innerHTML = entries
-      .sort((a,b) => new Date(b.date) - new Date(a.date))
-      .map(entry => {
-        const bp = (entry.sys && entry.dia) ? `${entry.sys}/${entry.dia} mmHg` : null;
-        const hr = entry.hr ? `${entry.hr} BPM` : null;
-        const weight = entry.weight ? `${entry.weight} lbs` : null;
-        const temp = entry.temp ? `${entry.temp} °F` : null;
+    // Current month days
+    const today = new Date();
+    for (let d = 1; d <= totalDays; d++) {
+      const dayDiv = document.createElement('div');
+      dayDiv.className = 'day-cell';
 
-        const vitalsSummary = [bp, hr, weight, temp].filter(Boolean).join(' • ');
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      
+      if (today.getFullYear() === year && today.getMonth() === month && today.getDate() === d) {
+        dayDiv.classList.add('today');
+      }
 
-        return `
-          <div class="entry-item">
-            <div class="entry-header">
-              <span>${entry.date}</span>
-              ${entry.vacationHours > 0 ? `<span class="vacation-badge">${entry.vacationHours} hrs PTO</span>` : ''}
-            </div>
-            ${vitalsSummary ? `<div class="vitals-grid">${vitalsSummary}</div>` : ''}
-            ${entry.notes ? `<div style="font-size: 0.85rem; color: #777; margin-top: 2px;">${entry.notes}</div>` : ''}
-          </div>
-        `;
-      }).join('');
+      dayDiv.innerHTML = `<span>${d}</span>`;
+
+      // Render indicator dots if data exists
+      if (entries[dateStr]) {
+        const dotsContainer = document.createElement('div');
+        dotsContainer.className = 'dots-container';
+
+        const entry = entries[dateStr];
+        const hasVitals = entry.sys || entry.dia || entry.hr || entry.weight || entry.temp || entry.notes;
+        const hasVacation = parseFloat(entry.vacation || 0) > 0;
+
+        if (hasVitals) {
+          const vDot = document.createElement('div');
+          vDot.className = 'dot dot-vitals';
+          dotsContainer.appendChild(vDot);
+        }
+        if (hasVacation) {
+          const vacDot = document.createElement('div');
+          vacDot.className = 'dot dot-vacation';
+          dotsContainer.appendChild(vacDot);
+        }
+        dayDiv.appendChild(dotsContainer);
+      }
+
+      dayDiv.onclick = () => openModal(dateStr);
+      daysGrid.appendChild(dayDiv);
+    }
   }
 
-  document.getElementById('ledgerForm').addEventListener('submit', (e) => {
+  function changeMonth(delta) {
+    currentDate.setMonth(currentDate.getMonth() + delta);
+    renderCalendar();
+  }
+
+  function openModal(dateStr) {
+    selectedDateStr = dateStr;
+    const entries = getEntries();
+    const entry = entries[dateStr] || {};
+
+    const [y, m, d] = dateStr.split('-');
+    document.getElementById('selectedDateLabel').innerText = `${m}/${d}/${y}`;
+
+    document.getElementById('sys').value = entry.sys || '';
+    document.getElementById('dia').value = entry.dia || '';
+    document.getElementById('hr').value = entry.hr || '';
+    document.getElementById('weight').value = entry.weight || '';
+    document.getElementById('temp').value = entry.temp || '';
+    document.getElementById('vacation').value = entry.vacation || '';
+    document.getElementById('notes').value = entry.notes || '';
+
+    document.getElementById('deleteBtn').style.display = entries[dateStr] ? 'block' : 'none';
+    document.getElementById('entryModal').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('entryModal').classList.remove('open');
+  }
+
+  document.getElementById('vitalsForm').addEventListener('submit', (e) => {
     e.preventDefault();
 
-    const date = document.getElementById('entryDate').value;
-    const sys = document.getElementById('sys').value;
-    const dia = document.getElementById('dia').value;
-    const hr = document.getElementById('hr').value;
-    const weight = document.getElementById('weight').value;
-    const temp = document.getElementById('temp').value;
-    const vacationHours = parseFloat(document.getElementById('vacationHours').value) || 0;
-    const notes = document.getElementById('notes').value;
+    const entries = getEntries();
+    entries[selectedDateStr] = {
+      sys: document.getElementById('sys').value,
+      dia: document.getElementById('dia').value,
+      hr: document.getElementById('hr').value,
+      weight: document.getElementById('weight').value,
+      temp: document.getElementById('temp').value,
+      vacation: document.getElementById('vacation').value,
+      notes: document.getElementById('notes').value,
+    };
 
-    const entries = getStoredEntries();
-    entries.push({ date, sys, dia, hr, weight, temp, vacationHours, notes });
     saveEntries(entries);
-
-    // Reset non-date inputs
-    document.getElementById('sys').value = '';
-    document.getElementById('dia').value = '';
-    document.getElementById('hr').value = '';
-    document.getElementById('weight').value = '';
-    document.getElementById('temp').value = '';
-    document.getElementById('vacationHours').value = '';
-    document.getElementById('notes').value = '';
+    closeModal();
   });
 
-  // Initial render
-  render();
+  function deleteEntry() {
+    const entries = getEntries();
+    delete entries[selectedDateStr];
+    saveEntries(entries);
+    closeModal();
+  }
+
+  // Render on load
+  renderCalendar();
 </script>
 </body>
 </html>
