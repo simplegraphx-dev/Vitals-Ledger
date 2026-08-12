@@ -280,6 +280,7 @@
     text-transform:uppercase;border-bottom:1px solid var(--grid-line);position:sticky;top:0;background:var(--paper);
   }
   .report-table td{padding:6px 8px;border-bottom:1px solid rgba(31,42,36,.06);white-space:nowrap;}
+  .report-table tfoot td{border-top:1.5px solid var(--ink);border-bottom:none;padding-top:8px;}
   .report-table td.notes-cell{white-space:normal;max-width:160px;}
   .report-empty{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-soft);padding:20px 0;text-align:center;}
 
@@ -363,6 +364,7 @@
   </div>
   <div class="cal-grid" id="cal-grid"><div class="loading">Loading your ledger…</div></div>
   <div class="month-stats" id="month-stats"></div>
+  <div class="month-stats" id="year-stats"></div>
   <div class="report-link" id="report-link">📄 View & export a date range</div>
 
   <div class="unit-toggle" id="unit-toggle">weight in lb — tap to switch to kg</div>
@@ -391,6 +393,7 @@
       <div class="view-row"><span class="view-label">Heart rate</span><span class="view-value" id="view-hr">—</span></div>
       <div class="view-row"><span class="view-label">Weight</span><span class="view-value" id="view-weight">—</span></div>
       <div class="view-row"><span class="view-label">Alcohol</span><span class="view-value" id="view-drank">—</span></div>
+      <div class="view-row"><span class="view-label">Vacation hours</span><span class="view-value" id="view-vacation">—</span></div>
       <div class="view-row view-notes-row" id="view-notes-row" style="display:none;">
         <span class="view-label">Notes</span>
         <div class="view-notes" id="view-notes-display"></div>
@@ -426,6 +429,10 @@
           <div class="drink-btn" id="drink-yes-btn">Yes</div>
           <div class="drink-btn" id="drink-no-btn">No</div>
         </div>
+      </div>
+      <div class="field-group">
+        <span class="field-label">Vacation hours used</span>
+        <input type="number" id="in-vacation" placeholder="0" inputmode="decimal" step="0.25" min="0">
       </div>
       <div class="field-group">
         <span class="field-label">Notes</span>
@@ -464,6 +471,15 @@
       <button class="btn btn-save" id="report-export-btn">Export to Excel</button>
     </div>
     <div class="btn-close" id="report-close-btn">Close</div>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="vacation-backdrop">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <p class="sheet-title" id="vacation-title">Vacation hours</p>
+    <div class="report-table-wrap" id="vacation-table-wrap"></div>
+    <div class="btn-close" id="vacation-close-btn">Close</div>
   </div>
 </div>
 
@@ -857,6 +873,8 @@
     document.getElementById('goal-cancel-btn').onclick=closeGoalEdit;
     document.getElementById('report-link').onclick=openReport;
     document.getElementById('report-close-btn').onclick=closeReport;
+    document.getElementById('vacation-close-btn').onclick=closeVacationList;
+    document.getElementById('vacation-backdrop').onclick=(e)=>{ if(e.target.id==='vacation-backdrop') closeVacationList(); };
     document.getElementById('report-backdrop').onclick=(e)=>{ if(e.target.id==='report-backdrop') closeReport(); };
     document.getElementById('report-generate-btn').onclick=generateReport;
     document.getElementById('report-export-btn').onclick=exportReportToExcel;
@@ -1123,6 +1141,45 @@
     parts.push(`<span class="ms-item ms-alc">Drinking days <b>${drinkDays}</b></span>`);
 
     box.innerHTML = `<div class="ms-row">${parts.join('')}</div>`;
+    renderYearStats();
+  }
+
+  function renderYearStats(){
+    const box = document.getElementById('year-stats');
+    const totalVac = vacationEntriesForYear(viewYear).reduce((sum,r)=> sum + r.hours, 0);
+    box.innerHTML = `<div class="ms-row"><span class="ms-item">Vacation hours (${viewYear}) <b>${totalVac}</b></span></div>`;
+    box.style.cursor = 'pointer';
+    box.onclick = ()=>openVacationList(viewYear);
+  }
+
+  function vacationEntriesForYear(year){
+    const prefix = `${year}-`;
+    return Object.keys(entries)
+      .filter(k=>k.startsWith(prefix) && entries[k].vacationHours)
+      .sort()
+      .map(k=>({ date:k, hours:entries[k].vacationHours }));
+  }
+
+  function openVacationList(year){
+    const rows = vacationEntriesForYear(year);
+    const total = rows.reduce((sum,r)=>sum+r.hours,0);
+    const person = people.find(p=>p.id===currentPersonId);
+    document.getElementById('vacation-title').textContent = `${person ? person.name+'\u2019s ' : ''}Vacation hours — ${year}`;
+    const wrap = document.getElementById('vacation-table-wrap');
+    if(rows.length===0){
+      wrap.innerHTML = '<div class="report-empty">No vacation hours logged this year.</div>';
+    } else {
+      let html = '<table class="report-table"><thead><tr><th>Date</th><th>Hours</th></tr></thead><tbody>';
+      rows.forEach(r=>{
+        html += `<tr><td>${r.date}</td><td>${r.hours}</td></tr>`;
+      });
+      html += `</tbody><tfoot><tr><td><b>Total</b></td><td><b>${total}</b></td></tr></tfoot></table>`;
+      wrap.innerHTML = html;
+    }
+    document.getElementById('vacation-backdrop').classList.add('open');
+  }
+  function closeVacationList(){
+    document.getElementById('vacation-backdrop').classList.remove('open');
   }
 
   let lastReportRows = [];
@@ -1167,6 +1224,7 @@
           heartRate: e.heartRate || '',
           weight: w!=null ? +w.toFixed(1) : '',
           drank: e.drank===true ? 'Yes' : (e.drank===false ? 'No' : ''),
+          vacationHours: e.vacationHours || '',
           notes: e.notes || ''
         };
       });
@@ -1180,11 +1238,11 @@
     }
 
     let html = `<table class="report-table"><thead><tr>
-      <th>Date</th><th>BP</th><th>Pulse</th><th>Weight (${settings.unit})</th><th>Drank</th><th>Notes</th>
+      <th>Date</th><th>BP</th><th>Pulse</th><th>Weight (${settings.unit})</th><th>Drank</th><th>Vacation Hrs</th><th>Notes</th>
     </tr></thead><tbody>`;
     rows.forEach(r=>{
       html += `<tr>
-        <td>${r.date}</td><td>${r.bp}</td><td>${r.heartRate}</td><td>${r.weight}</td><td>${r.drank}</td>
+        <td>${r.date}</td><td>${r.bp}</td><td>${r.heartRate}</td><td>${r.weight}</td><td>${r.drank}</td><td>${r.vacationHours}</td>
         <td class="notes-cell">${r.notes ? escapeHtml(r.notes) : ''}</td>
       </tr>`;
     });
@@ -1208,6 +1266,7 @@
       'Pulse (bpm)': r.heartRate,
       [`Weight (${settings.unit})`]: r.weight,
       'Drank': r.drank,
+      'Vacation Hours': r.vacationHours,
       'Notes': r.notes
     }));
     const ws = XLSX.utils.json_to_sheet(data);
@@ -1257,6 +1316,7 @@
     document.getElementById('view-hr').textContent = hr;
     document.getElementById('view-weight').textContent = wStr;
     document.getElementById('view-drank').textContent = drankStr;
+    document.getElementById('view-vacation').textContent = e.vacationHours ? `${e.vacationHours} hrs` : '—';
     const notesRow = document.getElementById('view-notes-row');
     if(e.notes){
       document.getElementById('view-notes-display').textContent = e.notes;
@@ -1272,6 +1332,7 @@
     document.getElementById('in-hr').value = e.heartRate || '';
     const w = displayWeight(e.weight);
     document.getElementById('in-weight').value = w!=null ? +w.toFixed(1) : '';
+    document.getElementById('in-vacation').value = e.vacationHours || '';
     document.getElementById('in-notes').value = e.notes || '';
     document.getElementById('btn-delete').style.display = (e && Object.keys(e).length) ? 'block':'none';
     pendingDrank = (e.drank===true || e.drank===false) ? e.drank : null;
@@ -1304,9 +1365,10 @@
     const dia = document.getElementById('in-diastolic').value;
     const hr = document.getElementById('in-hr').value;
     const wRaw = document.getElementById('in-weight').value;
+    const vacRaw = document.getElementById('in-vacation').value;
     const notes = document.getElementById('in-notes').value.trim();
 
-    if(!sys && !dia && !hr && !wRaw && !notes && pendingDrank===null){
+    if(!sys && !dia && !hr && !wRaw && !vacRaw && !notes && pendingDrank===null){
       delete entries[activeDate];
     } else {
       let weightLb = null;
@@ -1318,6 +1380,7 @@
         diastolic: dia? +dia : null,
         heartRate: hr? +hr : null,
         weight: weightLb,
+        vacationHours: vacRaw? +vacRaw : null,
         notes: notes || null,
         drank: pendingDrank
       };
