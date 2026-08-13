@@ -574,6 +574,48 @@
     }catch(e){ console.error('Cloud sync failed', e); }
   }
 
+  // Targeted pushes write only the specific path that changed, instead of the
+  // whole entriesByPerson/goalsByPerson tree — this avoids a device with a
+  // stale local cache clobbering another device's concurrent edit.
+  async function pushEntryToCloud(personId, date, entry){
+    if(!householdCode || applyingRemote) return;
+    try{
+      const val = entry===null ? firebase.firestore.FieldValue.delete() : entry;
+      await db.collection('households').doc(householdCode).set({
+        [`entriesByPerson.${personId}.${date}`]: val,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge:true });
+    }catch(e){ console.error('Cloud entry sync failed', e); }
+  }
+  async function pushGoalToCloud(personId, targetLb){
+    if(!householdCode || applyingRemote) return;
+    try{
+      const val = targetLb==null ? firebase.firestore.FieldValue.delete() : targetLb;
+      await db.collection('households').doc(householdCode).set({
+        [`goalsByPerson.${personId}`]: val,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge:true });
+    }catch(e){ console.error('Cloud goal sync failed', e); }
+  }
+  async function pushSettingsToCloud(){
+    if(!householdCode || applyingRemote) return;
+    try{
+      await db.collection('households').doc(householdCode).set({
+        settings: { unit: settings.unit },
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge:true });
+    }catch(e){ console.error('Cloud settings sync failed', e); }
+  }
+  async function pushPeopleToCloud(){
+    if(!householdCode || applyingRemote) return;
+    try{
+      await db.collection('households').doc(householdCode).set({
+        people,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge:true });
+    }catch(e){ console.error('Cloud people sync failed', e); }
+  }
+
   async function removePersonFromCloud(id){
     if(!householdCode) return;
     try{
@@ -790,7 +832,7 @@
     const id = 'p_'+Date.now();
     people.push({ id, name });
     await savePeople();
-    pushToCloud();
+    pushPeopleToCloud();
     closeAddPerson();
     await switchPerson(id);
   }
@@ -814,7 +856,7 @@
     const p = people.find(p=>p.id===editingPersonId);
     if(p) p.name = name;
     await savePeople();
-    pushToCloud();
+    pushPeopleToCloud();
     closeEditPerson();
     renderPeopleRow();
   }
@@ -842,7 +884,7 @@
       if(!(currentPersonId in goals)) goals[currentPersonId] = await loadGoalFor(currentPersonId);
     }
     await removePersonFromCloud(deletedId);
-    pushToCloud();
+    pushPeopleToCloud();
     renderPeopleRow();
     renderTrend();
     renderCalendar();
@@ -936,7 +978,7 @@
     settings.unit = settings.unit==='lb' ? 'kg' : 'lb';
     renderUnitLabel();
     saveSettings();
-    pushToCloud();
+    pushSettingsToCloud();
     renderGoalBox();
   }
   function renderUnitLabel(){
@@ -1015,7 +1057,7 @@
     const targetLb = raw==='' ? null : (settings.unit==='kg' ? (+raw/0.453592) : +raw);
     goals[currentPersonId] = targetLb;
     await saveGoal(currentPersonId, targetLb);
-    pushToCloud();
+    pushGoalToCloud(currentPersonId, targetLb);
     closeGoalEdit();
     renderGoalBox();
   }
@@ -1425,7 +1467,7 @@
       };
     }
     await saveEntries();
-    pushToCloud();
+    pushEntryToCloud(currentPersonId, activeDate, entries[activeDate] || null);
     closeSheet();
     renderTrend();
     renderCalendar();
@@ -1436,7 +1478,7 @@
     if(!activeDate) return;
     delete entries[activeDate];
     await saveEntries();
-    pushToCloud();
+    pushEntryToCloud(currentPersonId, activeDate, null);
     closeSheet();
     renderTrend();
     renderCalendar();
