@@ -288,6 +288,10 @@
   .report-table tfoot td{border-top:1.5px solid var(--ink);border-bottom:none;padding-top:8px;}
   .report-table td.notes-cell{white-space:normal;max-width:160px;}
   .report-empty{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--ink-soft);padding:20px 0;text-align:center;}
+  .vacation-holiday-label{
+    font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--holiday);margin:16px 0 8px;
+  }
 
   @media print{
     body > *:not(#report-backdrop){ display:none !important; }
@@ -1172,22 +1176,41 @@
       .map(k=>({ date:k, hours:entries[k].vacationHours }));
   }
 
+  function holidayEntriesForYear(year){
+    const prefix = `${year}-`;
+    return Object.keys(entries)
+      .filter(k=>k.startsWith(prefix) && entries[k].holiday)
+      .sort();
+  }
+
   function openVacationList(year){
     const rows = vacationEntriesForYear(year);
     const total = rows.reduce((sum,r)=>sum+r.hours,0);
+    const holidays = holidayEntriesForYear(year);
     const person = people.find(p=>p.id===currentPersonId);
     document.getElementById('vacation-title').textContent = `${person ? person.name+'\u2019s ' : ''}Vacation hours — ${year}`;
     const wrap = document.getElementById('vacation-table-wrap');
+    let html = '';
     if(rows.length===0){
-      wrap.innerHTML = '<div class="report-empty">No vacation hours logged this year.</div>';
+      html += '<div class="report-empty">No vacation hours logged this year.</div>';
     } else {
-      let html = '<table class="report-table"><thead><tr><th>Date</th><th>Hours</th></tr></thead><tbody>';
+      html += '<table class="report-table"><thead><tr><th>Date</th><th>Hours</th></tr></thead><tbody>';
       rows.forEach(r=>{
         html += `<tr><td>${r.date}</td><td>${r.hours}</td></tr>`;
       });
       html += `</tbody><tfoot><tr><td><b>Total</b></td><td><b>${total}</b></td></tr></tfoot></table>`;
-      wrap.innerHTML = html;
     }
+    html += `<p class="vacation-holiday-label">Holidays — ${year}</p>`;
+    if(holidays.length===0){
+      html += '<div class="report-empty">No holidays marked this year.</div>';
+    } else {
+      html += '<table class="report-table"><tbody>';
+      holidays.forEach(d=>{
+        html += `<tr><td>${d}</td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+    wrap.innerHTML = html;
     document.getElementById('vacation-backdrop').classList.add('open');
   }
   function closeVacationList(){
