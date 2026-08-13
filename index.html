@@ -27,6 +27,7 @@
     --wt:#3E7C8C;
     --wt-soft:#CFE1E5;
     --alc:#B98B3E;
+    --holiday:#3E8C5A;
     --alc-soft:#EAD9B8;
     --today-ring:#1F2A24;
   }
@@ -171,6 +172,10 @@
     margin-bottom:3px;
   }
   .day-cell.has-data .day-num{color:var(--ink);font-weight:600;}
+  .day-cell.holiday .day-num{color:var(--holiday);}
+  .holiday-group{display:flex;align-items:center;}
+  .holiday-label{display:flex;align-items:center;gap:8px;font-family:-apple-system,sans-serif;font-size:14px;color:var(--ink);cursor:pointer;}
+  .holiday-label input{width:18px;height:18px;accent-color:var(--holiday);}
   .fingerprint{display:flex;align-items:flex-end;gap:2.5px;height:22px;}
   .fp-bar{width:3px;border-radius:2px;background:var(--grid-line);}
   .fp-bar.bp{background:linear-gradient(to top, var(--bp-soft), var(--bp));}
@@ -394,6 +399,7 @@
       <div class="view-row"><span class="view-label">Weight</span><span class="view-value" id="view-weight">—</span></div>
       <div class="view-row"><span class="view-label">Alcohol</span><span class="view-value" id="view-drank">—</span></div>
       <div class="view-row"><span class="view-label">Vacation hours</span><span class="view-value" id="view-vacation">—</span></div>
+      <div class="view-row"><span class="view-label">Holiday</span><span class="view-value" id="view-holiday">—</span></div>
       <div class="view-row view-notes-row" id="view-notes-row" style="display:none;">
         <span class="view-label">Notes</span>
         <div class="view-notes" id="view-notes-display"></div>
@@ -433,6 +439,12 @@
       <div class="field-group">
         <span class="field-label">Vacation hours used</span>
         <input type="number" id="in-vacation" placeholder="0" inputmode="decimal" step="0.25" min="0">
+      </div>
+      <div class="field-group holiday-group">
+        <label class="holiday-label">
+          <input type="checkbox" id="in-holiday">
+          <span>Holiday</span>
+        </label>
       </div>
       <div class="field-group">
         <span class="field-label">Notes</span>
@@ -1064,7 +1076,7 @@
       const key = dateKey(viewYear, viewMonth, day);
       const e = entries[key];
       const cell=document.createElement('div');
-      cell.className='day-cell'+(e?' has-data':'')+(key===todayKey?' today':'');
+      cell.className='day-cell'+(e?' has-data':'')+(key===todayKey?' today':'')+(e && e.holiday?' holiday':'');
       const num=document.createElement('div');
       num.className='day-num';
       num.textContent=day;
@@ -1317,6 +1329,7 @@
     document.getElementById('view-weight').textContent = wStr;
     document.getElementById('view-drank').textContent = drankStr;
     document.getElementById('view-vacation').textContent = e.vacationHours ? `${e.vacationHours} hrs` : '—';
+    document.getElementById('view-holiday').textContent = e.holiday ? 'Yes' : 'No';
     const notesRow = document.getElementById('view-notes-row');
     if(e.notes){
       document.getElementById('view-notes-display').textContent = e.notes;
@@ -1333,6 +1346,7 @@
     const w = displayWeight(e.weight);
     document.getElementById('in-weight').value = w!=null ? +w.toFixed(1) : '';
     document.getElementById('in-vacation').value = e.vacationHours || '';
+    document.getElementById('in-holiday').checked = !!e.holiday;
     document.getElementById('in-notes').value = e.notes || '';
     document.getElementById('btn-delete').style.display = (e && Object.keys(e).length) ? 'block':'none';
     pendingDrank = (e.drank===true || e.drank===false) ? e.drank : null;
@@ -1366,9 +1380,10 @@
     const hr = document.getElementById('in-hr').value;
     const wRaw = document.getElementById('in-weight').value;
     const vacRaw = document.getElementById('in-vacation').value;
+    const isHoliday = document.getElementById('in-holiday').checked;
     const notes = document.getElementById('in-notes').value.trim();
 
-    if(!sys && !dia && !hr && !wRaw && !vacRaw && !notes && pendingDrank===null){
+    if(!sys && !dia && !hr && !wRaw && !vacRaw && !isHoliday && !notes && pendingDrank===null){
       delete entries[activeDate];
     } else {
       let weightLb = null;
@@ -1381,6 +1396,7 @@
         heartRate: hr? +hr : null,
         weight: weightLb,
         vacationHours: vacRaw? +vacRaw : null,
+        holiday: isHoliday,
         notes: notes || null,
         drank: pendingDrank
       };
