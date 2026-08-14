@@ -515,6 +515,18 @@
   const db = firebase.firestore();
 </script>
 <script>
+const APP_VERSION = '2026-07-29.1';
+(function(){
+  fetch(location.href, { cache:'no-store' })
+    .then(r=>r.text())
+    .then(html=>{
+      const m = html.match(/APP_VERSION = '([^']+)'/);
+      if(m && m[1] !== APP_VERSION){
+        window.location.href = location.pathname + '?_v=' + Date.now();
+      }
+    })
+    .catch(()=>{});
+})();
 (function(){
   const LEGACY_ENTRIES_KEY = 'entries'; // pre-multi-person data lives here
   const PEOPLE_KEY = 'people';
