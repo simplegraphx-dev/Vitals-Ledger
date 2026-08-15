@@ -294,16 +294,25 @@
   }
 
   @media print{
-    body > *:not(#report-backdrop){ display:none !important; }
-    #report-backdrop{
+    body > *:not(#report-backdrop):not(#vacation-backdrop){ display:none !important; }
+    #report-backdrop:not(.open), #vacation-backdrop:not(.open){ display:none !important; }
+    #report-backdrop.open{
       display:block !important; position:static !important; background:none !important;
     }
-    #report-backdrop .sheet{ box-shadow:none !important; max-height:none !important; }
-    #report-backdrop .sheet-handle,
-    #report-backdrop .report-range-row,
-    #report-backdrop .sheet-actions,
-    #report-backdrop .btn-close{ display:none !important; }
-    #report-backdrop .report-table-wrap{ max-height:none !important; overflow:visible !important; }
+    #report-backdrop.open .sheet{ box-shadow:none !important; max-height:none !important; }
+    #report-backdrop.open .sheet-handle,
+    #report-backdrop.open .report-range-row,
+    #report-backdrop.open .sheet-actions,
+    #report-backdrop.open .btn-close{ display:none !important; }
+    #report-backdrop.open .report-table-wrap{ max-height:none !important; overflow:visible !important; }
+    #vacation-backdrop.open{
+      display:block !important; position:static !important; background:none !important;
+    }
+    #vacation-backdrop.open .sheet{ box-shadow:none !important; max-height:none !important; }
+    #vacation-backdrop.open .sheet-handle,
+    #vacation-backdrop.open .sheet-actions,
+    #vacation-backdrop.open .btn-close{ display:none !important; }
+    #vacation-backdrop.open .report-table-wrap{ max-height:none !important; overflow:visible !important; }
     body{ background:#fff; }
   }
 
@@ -495,6 +504,9 @@
     <div class="sheet-handle"></div>
     <p class="sheet-title" id="vacation-title">Vacation hours</p>
     <div class="report-table-wrap" id="vacation-table-wrap"></div>
+    <div class="sheet-actions">
+      <button class="btn btn-delete" id="vacation-print-btn">Print</button>
+    </div>
     <div class="btn-close" id="vacation-close-btn">Close</div>
   </div>
 </div>
@@ -515,7 +527,7 @@
   const db = firebase.firestore();
 </script>
 <script>
-const APP_VERSION = '2026-07-29.2';
+const APP_VERSION = '2026-07-29.3';
 (function(){
   fetch(location.href, { cache:'no-store' })
     .then(r=>r.text())
@@ -955,6 +967,7 @@ const APP_VERSION = '2026-07-29.2';
     document.getElementById('report-link').onclick=openReport;
     document.getElementById('report-close-btn').onclick=closeReport;
     document.getElementById('vacation-close-btn').onclick=closeVacationList;
+    document.getElementById('vacation-print-btn').onclick=()=>window.print();
     document.getElementById('vacation-backdrop').onclick=(e)=>{ if(e.target.id==='vacation-backdrop') closeVacationList(); };
     document.getElementById('report-backdrop').onclick=(e)=>{ if(e.target.id==='report-backdrop') closeReport(); };
     document.getElementById('report-generate-btn').onclick=generateReport;
